@@ -1,4 +1,4 @@
-// Service slack implements a cowsaw Slack bot.
+// Service slack implements a github reviewer slack bot.
 package slack
 
 import (
@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -84,4 +85,30 @@ func verifyRequest(req *http.Request) (body []byte, err error) {
 		return body, eb.Msg("bad mac").Err()
 	}
 	return body, nil
+}
+
+// encore:api public raw method=POST path=/slack/events
+func SubscribeToEvents(w http.ResponseWriter, req *http.Request) {
+	log.Println("Subscribed to Slack events")
+
+	// Parse the request body
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		errs.HTTPError(w, errs.B().Cause(err).Err())
+		return
+	}
+
+	challenge := ""
+	var event map[string]interface{}
+	if err := json.Unmarshal(body, &event); err != nil {
+		errs.HTTPError(w, errs.B().Cause(err).Err())
+		return
+	}
+	if event["type"] == "url_verification" {
+		challenge = event["challenge"].(string)
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(200)
+	w.Write([]byte(challenge))
 }
