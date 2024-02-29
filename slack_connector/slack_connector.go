@@ -2,6 +2,7 @@
 package slack_connector
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log"
@@ -16,8 +17,16 @@ var secrets struct {
 	SlackSigningSecret string
 }
 
+func HandleMessagesEvent(ev *slackevents.MessageEvent) {
+	if ev.ChannelType != "channel" {
+		return
+	}
+
+	log.Printf("MessageEvent: %v", ev.Message.Text)
+}
+
 func HandleEvents(w http.ResponseWriter, req *http.Request) {
-	body, err := io.ReadAll(req.Body)
+	var body, err = io.ReadAll(req.Body)
 
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -44,21 +53,24 @@ func HandleEvents(w http.ResponseWriter, req *http.Request) {
 
 	if eventsAPIEvent.Type == slackevents.CallbackEvent {
 		innerEvent := eventsAPIEvent.InnerEvent
+
 		switch ev := innerEvent.Data.(type) {
-		case *slackevents.AppMentionEvent:
-			log.Printf("AppMentionEvent: %v", ev)
+		case *slackevents.MessageEvent:
+			HandleMessagesEvent(ev)
 		}
 	}
 }
 
 // encore:api public raw method=POST path=/slack/events
 func SubscribeToEvents(w http.ResponseWriter, req *http.Request) {
-	body, err := io.ReadAll(req.Body)
+	var body, err = io.ReadAll(req.Body)
 
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	req.Body = io.NopCloser(bytes.NewBuffer(body))
 
 	secretVerifier, err := slack.NewSecretsVerifier(req.Header, secrets.SlackSigningSecret)
 
