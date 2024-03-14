@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/slack-go/slack"
@@ -17,15 +16,23 @@ var secrets struct {
 	SlackSigningSecret string
 }
 
-func HandleMessagesEvent(ev *slackevents.MessageEvent) {
-	if ev.ChannelType != "channel" {
-		return
+//encore:service
+type Service struct {
+	svc     SlackService
+	Secrets struct {
+		SlackSigningSecret string
 	}
-
-	log.Printf("MessageEvent: %v", ev.Message.Text)
 }
 
-func HandleEvents(w http.ResponseWriter, req *http.Request) {
+func initService() (*Service, error) {
+	prChan := make(chan PullRequestMessage)
+	return &Service{
+		svc:     NewSlackService(prChan),
+		Secrets: secrets,
+	}, nil
+}
+
+func (s *Service) HandleEvents(w http.ResponseWriter, req *http.Request) {
 	var body, err = io.ReadAll(req.Body)
 
 	if err != nil {
@@ -54,15 +61,13 @@ func HandleEvents(w http.ResponseWriter, req *http.Request) {
 	if eventsAPIEvent.Type == slackevents.CallbackEvent {
 		innerEvent := eventsAPIEvent.InnerEvent
 
-		switch ev := innerEvent.Data.(type) {
-		case *slackevents.MessageEvent:
-			HandleMessagesEvent(ev)
-		}
+		s.svc.HandleEvent(innerEvent)
 	}
 }
 
-// encore:api public raw method=POST path=/slack/events
-func SubscribeToEvents(w http.ResponseWriter, req *http.Request) {
+// encore:api public raw method=POST path=/slack/webhook
+func (s *Service) EventWebhook(w http.ResponseWriter, req *http.Request) {
+
 	var body, err = io.ReadAll(req.Body)
 
 	if err != nil {
@@ -75,7 +80,7 @@ func SubscribeToEvents(w http.ResponseWriter, req *http.Request) {
 	secretVerifier, err := slack.NewSecretsVerifier(req.Header, secrets.SlackSigningSecret)
 
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -89,5 +94,5 @@ func SubscribeToEvents(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	HandleEvents(w, req)
+	s.HandleEvents(w, req)
 }

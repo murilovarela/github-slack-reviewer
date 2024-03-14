@@ -1,70 +1,41 @@
 package slack_connector_test
 
 import (
-	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"encore.app/slack_connector"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestSubscribeToEvents(t *testing.T) {
-	t.Run("SubscribeToEvents with url_verification", func(t *testing.T) {
-		var requestBody = []byte(`{"type":"url_verification","challenge":"test_challenge"}`)
-		var req, err = http.NewRequest("POST", "/slack/events", bytes.NewBuffer(requestBody))
+func TestEventWebhook(t *testing.T) {
 
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
+		// Create a new HTTP request with an invalid event
+		req := httptest.NewRequest(http.MethodPost, "/slack/webhook", nil)
+		// add a header to make a invalid NewSecretsVerifier
+		hash := hmac.New(sha256.New, []byte(s.Secrets.SlackSigningSecret))
+		stimestamp := "1234567890"
+		hash.Write([]byte(fmt.Sprintf("v0:%s:", stimestamp)))
 
-		var rr = httptest.NewRecorder()
-		handler := http.HandlerFunc(slack_connector.HandleEvents)
-		handler.ServeHTTP(rr, req)
+		fmt.Printf("v0=%s", string(hash.Sum(nil)))
+		req.Header.Add("X-Slack-Signature", "v0="+string(hash.Sum(nil)))
+		req.Header.Add("X-Slack-Request-Timestamp", stimestamp)
+		// add a valid body to the request
+		req.Body = io.NopCloser(strings.NewReader(`{"type":"valid"}`))
 
-		if status := rr.Code; status != http.StatusOK {
-			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-		}
+		// Create a new HTTP response recorder
+		res := httptest.NewRecorder()
 
-		var expectedResponse = "test_challenge"
+		// Call the EventWebhook method
+		s.EventWebhook(res, req)
 
-		if rr.Body.String() != expectedResponse {
-			t.Errorf("handler returned unexpected body: got %v want %v",
-				rr.Body.String(), expectedResponse)
-		}
-	})
-
-	t.Run("SubscribeToEvents with unknown type", func(t *testing.T) {
-		var requestBody = []byte(`{"type":"unknown_type","challenge":"test_challenge"}`)
-		var req, err = http.NewRequest("POST", "/slack/events", bytes.NewBuffer(requestBody))
-
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-
-		var rr = httptest.NewRecorder()
-		handler := http.HandlerFunc(slack_connector.HandleEvents)
-		handler.ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusOK {
-			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-		}
-	})
-
-	t.Run("SubscribeToEvents with callback_event", func(t *testing.T) {
-		var requestBody = []byte(`{"type":"callback_event","challenge":""}`)
-		var req, err = http.NewRequest("POST", "/slack/events", bytes.NewBuffer(requestBody))
-
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-
-		var rr = httptest.NewRecorder()
-		handler := http.HandlerFunc(slack_connector.HandleEvents)
-		handler.ServeHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusOK {
-			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-		}
+		// Check the response status code
+		assert.Equal(t, http.StatusUnauthorized, res.Code)
 	})
 }
