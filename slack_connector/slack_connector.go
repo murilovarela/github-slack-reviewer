@@ -2,7 +2,6 @@
 package slack_connector
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -32,41 +31,8 @@ func initService() (*Service, error) {
 	}, nil
 }
 
-func (s *Service) HandleEvents(w http.ResponseWriter, req *http.Request) {
-	var body, err = io.ReadAll(req.Body)
-
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if eventsAPIEvent.Type == slackevents.URLVerification {
-		var r *slackevents.ChallengeResponse
-		err := json.Unmarshal([]byte(body), &r)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text")
-		w.Write([]byte(r.Challenge))
-	}
-
-	if eventsAPIEvent.Type == slackevents.CallbackEvent {
-		innerEvent := eventsAPIEvent.InnerEvent
-
-		s.svc.HandleEvent(innerEvent)
-	}
-}
-
 // encore:api public raw method=POST path=/slack/webhook
-func (s *Service) EventWebhook(w http.ResponseWriter, req *http.Request) {
+func (s *Service) SlackWebhook(w http.ResponseWriter, req *http.Request) {
 
 	var body, err = io.ReadAll(req.Body)
 
@@ -75,9 +41,7 @@ func (s *Service) EventWebhook(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	req.Body = io.NopCloser(bytes.NewBuffer(body))
-
-	secretVerifier, err := slack.NewSecretsVerifier(req.Header, secrets.SlackSigningSecret)
+	secretVerifier, err := slack.NewSecretsVerifier(req.Header, s.Secrets.SlackSigningSecret)
 
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -94,5 +58,29 @@ func (s *Service) EventWebhook(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	s.HandleEvents(w, req)
+	eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if eventsAPIEvent.Type == slackevents.URLVerification {
+		var r *slackevents.ChallengeResponse
+		err := json.Unmarshal([]byte(body), &r)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text")
+		w.Write([]byte(r.Challenge))
+	}
+
+	if eventsAPIEvent.Type == slackevents.CallbackEvent {
+		innerEvent := slackevents.EventsAPIInnerEvent{Type: eventsAPIEvent.InnerEvent.Type, Data: eventsAPIEvent.InnerEvent.Data}
+
+		s.svc.HandleEvent(innerEvent)
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

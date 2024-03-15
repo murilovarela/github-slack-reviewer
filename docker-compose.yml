@@ -1,0 +1,16 @@
+version: '3.4'
+services:
+  postgres.db:
+    image: postgres:15
+    ports:
+      - '5432:5432'
+    volumes:
+      - pg-db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: PGU2yYtqZ+pyJraDtdj2Tkb3GgW4KcqT
+      PGPASSWORD: PGU2yYtqZ+pyJraDtdj2Tkb3GgW4KcqT
+      POSTGRES_DB: github_slack_bot
+    
+volumes:
+  pg-db:

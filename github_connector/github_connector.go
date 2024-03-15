@@ -1,10 +1,9 @@
 package github_connector
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 
-	webhooks "github.com/go-playground/webhooks/v6/github"
 	"github.com/google/go-github/v60/github"
 )
 
@@ -14,7 +13,7 @@ var secrets struct {
 
 type GithubService interface {
 	HandleWebhook(w http.ResponseWriter, req *http.Request)
-	HandleEvent()
+	HandleCommitCommentEvent(ev github.CommitCommentEvent)
 	GetMergeRequestDetails()
 }
 
@@ -31,25 +30,29 @@ func NewGithubService() GithubService {
 	}
 }
 
-func (s *githubService) HandleEvent() {}
+func (s *githubService) HandleCommitCommentEvent(ev github.CommitCommentEvent) {
+	log.Printf("Commit Comment: %+v", ev)
+}
 
 // github webhook
 // encore:api public raw method=POST path=/github/webhook
 func (s *githubService) HandleWebhook(w http.ResponseWriter, req *http.Request) {
-	hook, _ := webhooks.New(webhooks.Options.Secret(secrets.GithubWebhookSecret))
-	payload, err := hook.Parse(req, webhooks.ReleaseEvent, webhooks.PullRequestEvent)
+	payload, err := github.ValidatePayload(req, []byte(secrets.GithubWebhookSecret))
 	if err != nil {
-		if err == webhooks.ErrEventNotFound {
-			fmt.Printf("%+v", err)
-			// ok event wasn't one of the ones asked to be parsed
-		}
+		log.Printf("Error: %s", err)
 	}
-	switch payload := payload.(type) {
+	event, err := github.ParseWebHook(github.WebHookType(req), payload)
+	if err != nil {
+		log.Printf("Error: %s", err)
+	}
+	switch event := event.(type) {
+	case *github.CommitCommentEvent:
+		s.HandleCommitCommentEvent(*event)
+	case *github.CreateEvent:
+		log.Printf("Commit Comment: %+v", event)
+	}
 
-	case *webhooks.PullRequestPayload:
-		// Do whatever you want from here...
-		fmt.Printf("%+v", payload)
-	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // get github merge request details
