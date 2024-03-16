@@ -2,6 +2,7 @@ version: '3.4'
 services:
   postgres.db:
     image: postgres:15
+    container_name: dcs-postgres
     ports:
       - '5432:5432'
     volumes:
@@ -11,6 +12,22 @@ services:
       POSTGRES_PASSWORD: PGU2yYtqZ+pyJraDtdj2Tkb3GgW4KcqT
       PGPASSWORD: PGU2yYtqZ+pyJraDtdj2Tkb3GgW4KcqT
       POSTGRES_DB: github_slack_bot
-    
+  
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    depends_on:
+      - postgres.db
+    ports:
+      - "8080:80"
 volumes:
   pg-db:
+
+networks:
+  default:
+    name: local-network
+    external: true

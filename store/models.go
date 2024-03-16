@@ -11,7 +11,7 @@ type Organization struct {
 	Config       Config
 	Reviewers    []Reviewer
 	Messages     []Message
-	PullRequests []PullRequest
+	Pullrequests []Pullrequest
 }
 
 type Config struct {
@@ -26,7 +26,7 @@ type Reviewer struct {
 	OrganizationID int
 	GithubID       string
 	SlackID        string
-	PullRequests   []PullRequest `gorm:"many2many:pull_request_reviewers;"`
+	Pullrequests   []*Pullrequest `gorm:"many2many:pullrequest_reviewers;"`
 }
 
 type Message struct {
@@ -35,15 +35,14 @@ type Message struct {
 	SlackRef       string `gorm:"unique"`
 	Content        string
 	MessageType    string
-	PullRequestID  int
+	PullrequestID  int
 }
 
-type PullRequest struct {
+type Pullrequest struct {
 	gorm.Model
 	OrganizationID  int
 	GithubRef       string `gorm:"unique"`
 	LatestMessageID int
-	Reviewers       []Reviewer
-	Approvers       []Reviewer
+	Reviewers       []*Reviewer `gorm:"many2many:pullrequest_reviewers;"`
 	Messages        []Message
 }

@@ -1,8 +1,12 @@
 package github_connector
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/google/go-github/v60/github"
 )
@@ -14,7 +18,8 @@ var secrets struct {
 type GithubService interface {
 	HandleWebhook(w http.ResponseWriter, req *http.Request)
 	HandleCommitCommentEvent(ev github.CommitCommentEvent)
-	GetMergeRequestDetails()
+	GetMergeRequestDetails(owner string, repo string, id int) (*github.PullRequest, *github.Response, error)
+	GetMergeRequestDetailsFromUri(uri string) (*github.PullRequest, *github.Response, error)
 }
 
 //encore:service
@@ -55,8 +60,40 @@ func (s *githubService) HandleWebhook(w http.ResponseWriter, req *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
-// get github merge request details
-func (s *githubService) GetMergeRequestDetails() {
-	// get merge request details
+func (s *githubService) GetIdsFromUri(uri string) (owner string, repo string, id int, err error) {
+	trimmedUri := strings.TrimPrefix(uri, "https://github.com/")
+	parts := strings.Split(trimmedUri, "/")
 
+	if len(parts) < 4 {
+		err = fmt.Errorf("invalid GitHub URL: %s", uri)
+		return
+	}
+
+	owner = parts[0]
+	repo = parts[1]
+	id, err = strconv.Atoi(parts[3])
+	if err != nil {
+		log.Printf("invalid GitHub URL: %s", uri)
+		return
+	}
+
+	return
+}
+
+func (s *githubService) GetMergeRequestDetailsFromUri(uri string) (*github.PullRequest, *github.Response, error) {
+	owner, repo, id, err := s.GetIdsFromUri(uri)
+
+	if err != nil {
+		log.Printf("Error: %s", err)
+		return nil, nil, err
+	}
+
+	return s.GetMergeRequestDetails(owner, repo, id)
+}
+
+// get github merge request details
+func (s *githubService) GetMergeRequestDetails(owner string, repo string, id int) (*github.PullRequest, *github.Response, error) {
+	// get merge request details from github
+	ctx := context.Background()
+	return s.githubClient.PullRequests.Get(ctx, owner, repo, id)
 }

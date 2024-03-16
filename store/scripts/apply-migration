@@ -1,0 +1,13 @@
+#!/bin/bash
+set -eu
+MIGRATION_NAME=${1:-}
+DEV_URL=postgres://testuser:PGU2yYtqZ+pyJraDtdj2Tkb3GgW4KcqT@localhost:5432/github_slack_bot?sslmode=disable
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+# GORM executes Go code without initializing Encore when generating migrations,
+# so configure the Encore runtime to be aware that this is expected.
+export ENCORERUNTIME_NOPANIC=1
+
+# Apply the migration
+atlas schema apply --env "gorm"  --url "$DEV_URL"

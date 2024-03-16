@@ -17,10 +17,13 @@ encore app create my-app-name --example=slack-bot
 ## Running locally
 
 Run your application:
+
 ```bash
 encore run
 ```
+
 To use the Slack integration, set the Slack signing secret (see tutorial above):
+
 ```bash
 encore secret set SlackSigningSecret
 ```
@@ -44,3 +47,5 @@ Then head over to the [Cloud Dashboard](https://app.encore.dev) to monitor your 
 From there you can also connect your own AWS or GCP account to use for deployment.
 
 Now off you go into the clouds!
+
+postgres://testuser:PGU2yYtqZ+pyJraDtdj2Tkb3GgW4KcqT@localhost:5432/github_slack_bot

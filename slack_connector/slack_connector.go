@@ -13,6 +13,8 @@ import (
 // This uses Encore's built-in secrets manager, learn more: https://encore.dev/docs/primitives/secrets
 var secrets struct {
 	SlackSigningSecret string
+	SlackClientSecret  string
+	SlackBotUserToken  string
 }
 
 //encore:service
@@ -20,13 +22,14 @@ type Service struct {
 	svc     SlackService
 	Secrets struct {
 		SlackSigningSecret string
+		SlackClientSecret  string
+		SlackBotUserToken  string
 	}
 }
 
 func initService() (*Service, error) {
-	prChan := make(chan PullRequestMessage)
 	return &Service{
-		svc:     NewSlackService(prChan),
+		svc:     NewSlackService(),
 		Secrets: secrets,
 	}, nil
 }
@@ -75,11 +78,10 @@ func (s *Service) SlackWebhook(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text")
 		w.Write([]byte(r.Challenge))
 	}
-
 	if eventsAPIEvent.Type == slackevents.CallbackEvent {
 		innerEvent := slackevents.EventsAPIInnerEvent{Type: eventsAPIEvent.InnerEvent.Type, Data: eventsAPIEvent.InnerEvent.Data}
 
-		s.svc.HandleEvent(innerEvent)
+		s.svc.HandleEvents(innerEvent)
 	}
 
 	w.WriteHeader(http.StatusOK)
